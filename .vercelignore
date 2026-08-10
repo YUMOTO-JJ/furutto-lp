@@ -1,0 +1,7 @@
+# 公開に不要なものを上げない
+.claude
+.vercel
+.env.local
+.gitignore
+CLAUDE.md
+.DS_Store

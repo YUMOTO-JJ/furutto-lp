@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FURUTTO — 果物は、書いてある分だけ。</title>
+<meta name="description" content="巨峰・完熟オレンジ・紅玉りんご。書いてある分の果物だけで作る、砂糖を入れないフルーツシェイク。中目黒・中崎町・薬院の3店舗。">
+<meta name="theme-color" content="#C89BE0">
+
+<!-- 公開URL。og:image は絶対URLでないとSNSが画像を読まない -->
+<meta property="og:url" content="https://furutto.vercel.app/">
+<meta property="og:image" content="https://furutto.vercel.app/assets/ogp.jpg">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FURUTTO">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:title" content="FURUTTO — 果物は、書いてある分だけ。">
+<meta property="og:description" content="巨峰・完熟オレンジ・紅玉りんご。砂糖を入れず、その場で砕いて30秒でお出しするフルーツシェイク。※ポートフォリオ用の架空ブランドです。">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="むらさきのシェイクのまわりに巨峰が舞う、FURUTTO のキービジュアル">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="assets/icon-512.png" type="image/png" sizes="512x512">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,900&family=Outfit:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&family=Shippori+Mincho+B1:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root { --ease: cubic-bezier(0.22, 1, 0.36, 1); }
+  body { font-family:'Outfit','Noto Sans JP',sans-serif; overflow-x:hidden; background:#0E0B10; }
+
+  .track { height:600vh; position:relative; z-index:1; background:#C89BE0; }
+  .stage {
+    position:sticky; top:0; height:100vh; height:100dvh; overflow:hidden;
+    --ink:#FFFFFF; --dark:#4B2258; --tone:#C89BE0;
+    background:var(--tone);
+  }
+
+  /* 画像座標系(1024x572)を保った共通キャンバス */
+  .canvas {
+    position:absolute; left:50%; top:50%;
+    transform:translate(-50%,-50%);
+    width:max(100vw, 179.04dvh);
+    aspect-ratio:5500/3072;
+  }
+  .l-sky    { z-index:1; }
+  .l-word   { z-index:5; }
+  .l-glass  { z-index:8;  pointer-events:none; }
+  .l-back   { z-index:9;  pointer-events:none; }  /* 奥の果物（液体より奥） */
+  .l-liquid { z-index:10; pointer-events:none; }
+  .l-front  { z-index:12; pointer-events:none; }  /* 手前の果物（文字の上を通る） */
+
+  .sky, .liquid { position:absolute; opacity:0; }
+  .sky { inset:0; width:100%; height:100%; }
+  .sky.on { opacity:1; }
+
+  /* 液体の海：画像下部。y=326px(=56.99%)から下端まで
+     空と液体は別画像なので、上端でぷつっと止めるとグラデーションの傾きが折れて
+     横一直線に見える（りんごが最悪で傾きが20倍変わる）。上端をぼかして空に渡す */
+  .liquid { left:0; top:56.315%; width:100%;
+            -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 8%);
+                    mask-image:linear-gradient(to bottom, transparent 0, #000 8%); }
+  .liquid.on { opacity:1; }
+
+  .glass, .fruit { position:absolute; opacity:0; }
+  .glass.on, .fruit.on { opacity:1; }
+
+  /* ---- 巨大タイポ ---- */
+  /* 文字の下端は液面から逆算して固定する。液体(z10)は文字(z5)より手前なので、
+     文字が液面をまたぐと、液体の上端が白い文字を定規のように横切って線に見える。
+     液面はキャンバス高さの56.315%＝下から43.685%。padding-% は幅基準なので
+     43.685 / 1.791(=5500/3072) ＋ 余白ぶん を幅%に換算した値を入れる */
+  .word {
+    position:absolute; inset:0;
+    display:flex; align-items:flex-end; justify-content:center;
+    padding-bottom:26.5%;
+    pointer-events:none; overflow:hidden;
+  }
+  .word h1 {
+    font-family:'Fraunces'; font-weight:900;
+    font-size:clamp(3.5rem, 17vw, 15.5rem);
+    letter-spacing:-.02em; color:var(--ink);
+    white-space:nowrap;
+    text-shadow:0 4px 40px rgba(0,0,0,.10);
+  }
+
+  /* ---- ナビ ---- */
+  .nav {
+    position:absolute; inset:0 0 auto 0; z-index:40;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:20px clamp(16px,4vw,48px); color:var(--ink);
+  }
+  .brand { font-family:'Fraunces'; font-weight:900; font-size:22px; }
+  .nav-links { display:flex; gap:28px; font-size:14px; opacity:.9; }
+  .nav-cta {
+    font-size:13px; font-weight:700; color:var(--dark);
+    background:#fff; border-radius:99px; padding:10px 20px;
+    text-decoration:none; transition:transform .3s var(--ease);
+  }
+  .nav-cta:hover { transform:scale(1.05); }
+  @media (max-width:720px){ .nav-links{ display:none; } }
+
+  /* ---- 商品カード ---- */
+  .card {
+    position:absolute; left:clamp(16px,4vw,48px); bottom:clamp(76px,10vh,72px); z-index:40;
+    background:rgba(255,255,255,.9); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+    border-radius:22px; padding:16px; width:min(78vw,280px);
+    color:#241420; box-shadow:0 18px 50px rgba(0,0,0,.18);
+  }
+  .card-top { display:flex; gap:12px; align-items:center; }
+  .thumb { width:52px; height:52px; border-radius:14px; overflow:hidden; flex:none; background:#ddd; }
+  .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .card h2 { font-size:16px; font-weight:700; }
+  .card p  { font-size:12px; opacity:.65; margin-top:2px; }
+  .meta { display:flex; gap:14px; font-size:11px; opacity:.6; margin:10px 0 12px; }
+  .cta { display:block; text-align:center; font-size:13px; font-weight:700;
+         background:#1c1c1c; color:#fff; border-radius:99px; padding:11px;
+         text-decoration:none; transition:transform .3s var(--ease); }
+  .cta:hover { transform:scale(1.03); }
+
+  /* ---- バッジ・ドット・矢印 ---- */
+  .badge { position:absolute; left:50%; bottom:clamp(70px,9vh,64px); z-index:30;
+           transform:translateX(-50%); width:84px; height:84px; color:var(--ink);
+           opacity:.9; pointer-events:none; }
+  .badge svg { width:100%; height:100%; animation:spin 14s linear infinite; }
+  @keyframes spin { to{ transform:rotate(360deg) } }
+  .badge .pct { position:absolute; inset:0; display:flex; align-items:center;
+                justify-content:center; font-family:'Fraunces'; font-weight:900; font-size:17px; }
+  @media (max-width:720px){ .badge{ display:none; } }
+
+  .dots { position:absolute; right:clamp(14px,3vw,32px); top:50%; z-index:40;
+          transform:translateY(-50%); display:flex; flex-direction:column; gap:12px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--ink); opacity:.4;
+         transition:all .4s var(--ease); cursor:pointer; border:none; padding:0; }
+  .dot.on { opacity:1; transform:scale(1.5); }
+
+  .arrows { position:absolute; right:clamp(16px,4vw,48px); bottom:clamp(76px,10vh,68px);
+            z-index:40; display:flex; gap:10px; }
+  .arrow { width:42px; height:42px; border-radius:50%;
+           border:1px solid color-mix(in srgb, var(--ink) 60%, transparent);
+           background:transparent; color:var(--ink); font-size:16px; cursor:pointer;
+           transition:all .3s var(--ease); }
+  .arrow:hover { background:#fff; color:#241420; }
+
+  .hint { position:absolute; left:50%; bottom:18px; z-index:40; transform:translateX(-50%);
+          color:var(--ink); font-size:11px; letter-spacing:.2em; opacity:.7; }
+
+  /* 動きを減らす設定。CSS由来のアニメと遷移だけ止める。
+     GSAP はインラインstyleを毎フレーム書き換えるので、ここでは止まらない
+     （そちらは JS の REDUCE 分岐が担当） */
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after {
+      animation-duration:.01ms !important;
+      animation-iteration-count:1 !important;
+      transition-duration:.01ms !important;
+      scroll-behavior:auto !important;
+    }
+  }
+
+  /* ---- 縦画面 ----
+     横長の元構図はそのままでは入らないが、グラスと液体だけは
+     「グラスの足元に波紋がくぼんでいる」という元写真の関係を持っているので、
+     この2つは絶対に別々に拡縮しない。専用キャンバスに乗せたまま、
+     画面下端に合わせて小さくする。
+     空・文字・果物は画面いっぱいの座標系に移し、果物は JS の PLACE_SM で並べ直す。 */
+  @media (max-width:760px){
+    /* 空・グラス・液体は元が1枚の写真。縮尺を1つでもずらすと液体の上端が
+       背景に溶けず横一直線の段差になるので、3つとも PC と同じキャンバスのまま。
+       動かすのは果物と文字だけ。 */
+    .l-word, .l-back, .l-front {
+      left:0; top:0; width:100%; height:100%; transform:none; aspect-ratio:auto;
+    }
+    /* 文字はグラス(z8)の手前・液体(z10)の奥へ。液面に浸かって見える。
+       文字の大きさは幅基準・液面の位置は高さ基準なので、上から位置を決めると
+       横長の画面（SEなど）で沈みすぎる。下端＝液面から逆算して固定する。
+       液面は下から 43.685dvh。そこから 1.4dvh ぶん沈める */
+    .l-word { z-index:9; }
+    .word { align-items:flex-end; padding-bottom:42.3dvh; }
+    /* Orangelicious（13字）が 1行で収まる上限が約12vw */
+    .word h1 { font-size:clamp(2rem,12vw,4.4rem); }
+    /* カードと矢印がぶつかるので、カードを詰める */
+    .card { width:min(64vw,240px); }
+  }
+
+  /* ============================================================
+     後続セクション（02〜06 ＋ フッター）
+     暗いゾーン（証明・品書き・つくり）→ 色が戻る（約束）→ 明るく閉じる（店）
+     ============================================================ */
+  /* 立ち上がりアニメの開始位置（x:24 など）が横スクロールを生まないように。
+     clip はスクロールコンテナを作らないので sticky を壊さない */
+  .content { position:relative; z-index:2; background:#141016; color:#EDEDE2; overflow-x:clip; }
+  .wrap { width:min(1180px, 100% - clamp(32px,9vw,140px)); margin-inline:auto; }
+  .sec  { padding:clamp(88px,14vh,164px) 0; position:relative; }
+  .clip { overflow:hidden; }
+
+  .eyebrow { font-family:'Outfit'; font-size:11px; letter-spacing:.3em; text-transform:uppercase;
+             opacity:.42; margin-bottom:clamp(20px,3vw,34px); }
+  .lead { font-family:'Shippori Mincho B1','Fraunces',serif; font-weight:800;
+          font-size:clamp(1.85rem,4.8vw,3.8rem); line-height:1.3; letter-spacing:.01em; }
+  .sub  { margin-top:clamp(18px,2.6vw,30px); font-size:clamp(13px,1.1vw,15px);
+          line-height:2.1; opacity:.58; max-width:34em; }
+  /* 日本語の折り返しを文節で切る（対応外のブラウザは従来どおり） */
+  .lead, .sub, .shake .desc, .dia-list p, .pdesc, .count-note, .stores .addr
+    { text-wrap:pretty; word-break:auto-phrase; }
+
+  /* ---- 02 COUNT：ヒーローで降った粒の着地点。100% REAL FRUIT の答え合わせ ---- */
+  .drops { position:absolute; inset:0; pointer-events:none; z-index:0; }
+  .drops img { position:absolute; opacity:.17; filter:blur(1.5px); }
+  .s-count .wrap { position:relative; z-index:1; }
+  .counts { display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(22px,4vw,56px);
+            margin-top:clamp(48px,7vw,90px); }
+  .count-item { border-top:1px solid rgba(237,237,226,.16); padding-top:26px; }
+  /* 果物ごとに縦横比が違うので、高さで揃えて3列のベースラインを合わせる */
+  .count-item > img { height:clamp(58px,6.8vw,92px); width:auto; max-width:80%;
+                      object-fit:contain; object-position:left bottom;
+                      display:block; margin-bottom:20px; }
+  .num { font-family:'Fraunces'; font-weight:900; font-size:clamp(3rem,7.6vw,6rem);
+         line-height:.9; letter-spacing:-.035em; display:flex; align-items:baseline; gap:.14em; }
+  .num em { font-family:'Noto Sans JP'; font-style:normal; font-weight:500;
+            font-size:clamp(12px,1.2vw,15px); letter-spacing:.08em; opacity:.55; }
+  .count-item .cl { margin-top:18px; font-size:12px; letter-spacing:.05em; opacity:.5; }
+  .count-note { margin-top:clamp(46px,6vw,76px); font-size:13px; line-height:2.15;
+                opacity:.48; max-width:38em; }
+  @media (max-width:760px){
+    .counts { grid-template-columns:1fr; gap:0; }
+    .count-item { padding:24px 0; }
+    .count-item > img { margin-bottom:14px; }
+  }
+
+  /* ---- 03 OUR SHAKES：動き回っていた3杯を、初めて並べて比べさせる ---- */
+  .shelf { display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(14px,1.8vw,24px);
+           margin-top:clamp(44px,6vw,74px); }
+  .shake { --c:#C89BE0; border-radius:26px; overflow:hidden; background:#1A151C;
+           display:flex; flex-direction:column; }
+  .shake-vis { position:relative; aspect-ratio:4/5; background:var(--c); overflow:hidden; }
+  .shake-vis .sg { position:absolute; left:50%; bottom:-7%; height:90%; width:auto;
+                   transform:translateX(-50%); transition:transform .8s var(--ease); }
+  /* 素材の果実。商品と一緒に写り込むイメージで左上に重ねる */
+  .shake-vis .sp { position:absolute; left:2%; top:5%; width:44%;
+                   filter:drop-shadow(0 16px 24px rgba(0,0,0,.24));
+                   transition:transform .8s var(--ease); }
+  .shake:hover .sg { transform:translateX(-50%) translateY(-3%) scale(1.04); }
+  .shake:hover .sp { transform:translateY(-10px) rotate(-4deg); }
+  .shake-body { padding:clamp(20px,2.2vw,30px); flex:1; display:flex; flex-direction:column; }
+  .shake-body h3 { font-family:'Fraunces'; font-weight:900; font-size:clamp(20px,1.9vw,26px);
+                   letter-spacing:-.01em; }
+  .jpname { font-size:11px; letter-spacing:.14em; opacity:.4; margin-top:7px; }
+  .shake .desc { font-size:13px; line-height:2; opacity:.64; margin-top:18px; }
+  .spec { margin-top:24px; border-top:1px solid rgba(237,237,226,.12); }
+  .spec > div { display:flex; justify-content:space-between; gap:12px; padding:11px 0;
+                border-bottom:1px solid rgba(237,237,226,.08); font-size:12px; }
+  .spec dt { opacity:.4; }
+  .spec dd { opacity:.85; text-align:right; }
+  .price { margin-top:auto; padding-top:24px; font-family:'Fraunces'; font-weight:900;
+           font-size:clamp(22px,2vw,28px); color:var(--c); }
+  @media (max-width:900px){ .shelf { grid-template-columns:1fr; } }
+
+  /* ---- 04 LAYERS：ヒーローのレイヤー構造を、そのまま商品の説明図に転用 ---- */
+  .diagram { display:grid; grid-template-columns:minmax(180px,.75fr) 1.5fr;
+             gap:clamp(28px,6vw,92px); align-items:center; margin-top:clamp(44px,6vw,82px); }
+  .dia-glass { display:flex; justify-content:center; }
+  .dia-glass img { width:min(100%,190px); }   /* shake_grape は縦長なので幅を控えめに */
+  .dia-body { position:relative; padding-left:clamp(22px,3vw,42px); max-width:600px; }
+  .dia-list { list-style:none; }
+  .dia-rail { position:absolute; left:0; top:10px; bottom:10px; width:1px;
+              background:rgba(237,237,226,.14); }
+  .dia-rail i { position:absolute; inset:0; display:block; background:#C89BE0;
+                transform-origin:50% 0%; }
+  .dia-list li { padding:clamp(18px,2.4vw,28px) 0; position:relative; }
+  /* 各層がレールのどこに乗っているかを示す点 */
+  .dia-list li::before { content:''; position:absolute; border-radius:50%;
+    width:7px; height:7px; background:#C89BE0;
+    left:calc(clamp(22px,3vw,42px) * -1 - 3px);
+    top:calc(clamp(18px,2.4vw,28px) + 4px); }
+  .dia-list li + li { border-top:1px solid rgba(237,237,226,.1); }
+  .dia-list .no { font-family:'Fraunces'; font-weight:900; font-size:13px;
+                  opacity:.34; letter-spacing:.06em; }
+  .dia-list h3 { font-family:'Shippori Mincho B1',serif; font-weight:600;
+                 font-size:clamp(17px,1.7vw,22px); margin-top:9px; }
+  .dia-list p { font-size:13px; line-height:2.05; opacity:.56; margin-top:11px; max-width:26em; }
+  @media (max-width:820px){
+    .diagram { grid-template-columns:1fr; gap:clamp(20px,4vw,40px); }
+    .dia-glass img { width:min(38%,140px); }
+  }
+
+  /* ---- 05 PROMISE：三つの色を一度に戻す三連パネル ---- */
+  .s-promise { position:relative; padding-bottom:clamp(88px,14vh,164px); }
+  .pro-intro { padding:clamp(88px,14vh,164px) 0 clamp(30px,5vh,54px); }
+  .pro-tri { display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(8px,1vw,14px);
+             height:min(74dvh,660px); padding-inline:clamp(16px,4vw,48px); }
+  .pro-panel { position:relative; overflow:hidden; border-radius:24px; color:#fff;
+               display:flex; align-items:flex-end; }
+  /* sky_orange / sky_apple は左寄り（x≈33%）に果物の消し残りがあるので、右端の無地を使う */
+  .pro-panel > img { position:absolute; inset:0; width:100%; height:100%;
+                     object-fit:cover; object-position:100% 50%; }
+  .pro-panel::after { content:''; position:absolute; inset:0;
+    background:linear-gradient(180deg, rgba(20,16,22,0) 32%, rgba(20,16,22,.68)); }
+  /* 素材のカットをパネルに浮かせる。文字は下端なので上半分に置く。
+     すぐ上の .pro-panel > img（空の背景）より詳細度を上げないと
+     inset:0 / width:100% に負けて画面いっぱいに広がる */
+  .pro-panel > img.pro-obj {
+    inset:auto; left:50%; top:7%; translate:-50% 0;
+    width:80%; height:auto; max-height:52%;
+    object-fit:contain; object-position:center top; z-index:1;
+    filter:drop-shadow(0 24px 34px rgba(0,0,0,.28));
+  }
+  .pro-in { position:relative; z-index:2; padding:clamp(22px,2.4vw,34px); }
+  .pno { font-family:'Fraunces'; font-weight:900; font-size:clamp(26px,3vw,46px);
+         line-height:1; opacity:.62; display:block; }
+  .pro-panel h3 { font-family:'Shippori Mincho B1',serif; font-weight:800;
+                  font-size:clamp(19px,2.1vw,29px); margin-top:12px; letter-spacing:.01em; }
+  .pro-fact { display:inline-block; margin-top:16px; font-size:11px; letter-spacing:.1em;
+              padding:7px 14px; border-radius:99px; background:rgba(255,255,255,.2);
+              -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+  .pdesc { margin-top:15px; font-size:13px; line-height:2.05; opacity:.86; }
+  @media (max-width:820px){
+    .pro-tri { grid-template-columns:1fr; height:auto; gap:12px; }
+    /* 横長の枠だと消し残りが入り込むので、縦を確保して切り取り幅を狭くする */
+    .pro-panel { min-height:46dvh; }
+    /* 縦だとパネルが低いので、素材を小さくして番号に被らせない */
+    .pro-panel > img.pro-obj { max-height:40%; top:5%; }
+  }
+
+  /* 表示用の強制改行はPCだけ。狭い画面では自然な折り返しに任せる */
+  @media (max-width:760px){ .lead br, .sub br, .pdesc br { display:none; } }
+
+  /* ---- 06 STORES：締めのセクション。ここで明るく開いて終わる ---- */
+  .s-stores { background:#F4EFE6; color:#241420; }
+  .s-stores .wrap { position:relative; z-index:1; }
+  .s-stores .sub { opacity:.62; }
+  .stores { list-style:none; margin-top:clamp(40px,5vw,68px);
+            border-top:1px solid rgba(36,20,32,.2); }
+  .stores li { display:grid; grid-template-columns:60px 1.1fr 1.5fr 1fr; gap:20px;
+               align-items:baseline; padding:clamp(22px,2.8vw,32px) 0;
+               border-bottom:1px solid rgba(36,20,32,.14); }
+  .st-no { font-family:'Fraunces'; font-weight:900; font-size:13px; opacity:.4; }
+  .stores h3 { font-family:'Shippori Mincho B1',serif; font-weight:600;
+               font-size:clamp(18px,2vw,26px); }
+  .stores .addr, .stores .hrs { font-size:12.5px; line-height:1.95; opacity:.6; }
+  .stores li.soon { opacity:.5; }
+  /* グリッドの子は display が block 化されるので、幅は justify-self で詰める */
+  .soon-tag { justify-self:start; font-size:11px; letter-spacing:.08em;
+              padding:5px 13px; border-radius:99px; border:1px solid rgba(36,20,32,.3); }
+  .store-cta { display:flex; flex-wrap:wrap; gap:12px; margin-top:clamp(36px,5vw,56px); }
+  .btn { font-size:13.5px; font-weight:700; border-radius:99px; padding:16px 30px;
+         text-decoration:none; transition:transform .3s var(--ease), opacity .3s var(--ease); }
+  .btn-p { background:#241420; color:#F4EFE6; }
+  .btn-s { border:1px solid rgba(36,20,32,.28); color:#241420; }
+  .btn:hover { transform:translateY(-2px); }
+  @media (max-width:820px){
+    .stores li { grid-template-columns:40px 1fr; gap:6px 16px; }
+    .stores .addr, .stores .hrs, .stores .soon-tag { grid-column:2; }
+  }
+
+  /* ---- 押せないCTAのお知らせ ----
+     架空ブランドなので飛び先が無い。黙って何も起きないより、理由を出す */
+  .toast {
+    position:fixed; left:50%; bottom:28px; z-index:100; translate:-50% 0;
+    background:rgba(20,16,22,.93); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+    color:#EDEDE2; border-radius:16px; padding:15px 24px;
+    font-size:13px; line-height:1.75; text-align:center;
+    /* left:50% だと右半分しか幅が取れないので、max-content で内容ぶん確保してから絞る */
+    width:max-content; max-width:min(88vw,420px); pointer-events:none;
+    box-shadow:0 18px 50px rgba(0,0,0,.38);
+    opacity:0; visibility:hidden; transform:translateY(10px);
+    transition:opacity .35s var(--ease), transform .35s var(--ease), visibility .35s;
+  }
+  .toast.on { opacity:1; visibility:visible; transform:translateY(0); }
+
+  /* ---- フッター ---- */
+  .s-foot { background:#0E0B10; color:#EDEDE2; padding:clamp(64px,9vw,112px) 0 40px; }
+  .foot-mark { font-family:'Fraunces'; font-weight:900; font-size:clamp(3rem,13vw,10rem);
+               line-height:.88; letter-spacing:-.035em; opacity:.92; }
+  .foot-rows { display:flex; flex-wrap:wrap; gap:clamp(24px,5vw,80px);
+               justify-content:space-between; margin-top:clamp(40px,6vw,74px);
+               padding-top:34px; border-top:1px solid rgba(237,237,226,.12); }
+  .foot-rows nav { display:flex; flex-wrap:wrap; gap:22px; font-size:12.5px; }
+  .foot-rows a { color:inherit; text-decoration:none; opacity:.62; transition:opacity .3s; }
+  .foot-rows a:hover { opacity:1; }
+  .foot-meta { font-size:11.5px; line-height:2; opacity:.4; }
+  .fiction { margin-top:36px; font-size:11px; opacity:.3; letter-spacing:.04em; line-height:1.9; }
+
+  .nav-links a { color:inherit; text-decoration:none; }
+</style>
+</head>
+<body>
+
+<div class="track" id="track">
+  <div class="stage" id="stage">
+
+    <div class="canvas l-sky" id="skyLayer"></div>
+    <div class="canvas l-word"><div class="word"><h1 id="word">Grapetastic</h1></div></div>
+    <div class="canvas l-glass" id="glassLayer"></div>
+    <div class="canvas l-back" id="backLayer"></div>
+    <div class="canvas l-liquid" id="liquidLayer"></div>
+    <div class="canvas l-front" id="frontLayer"></div>
+
+    <nav class="nav">
+      <div class="brand">FURUTTO</div>
+      <div class="nav-links">
+        <a href="#track">Home</a><a href="#shakes">Our Shakes</a>
+        <a href="#layers">How It's Made</a><a href="#promise">Promise</a>
+      </div>
+      <a class="nav-cta" href="#stores">Find a Store</a>
+    </nav>
+
+    <div class="card">
+      <div class="card-top">
+        <div class="thumb"><img id="cardThumb" src="assets/thumb_grape.webp" alt=""></div>
+        <div><h2 id="cardName">Grape Velvet</h2><p id="cardDesc">巨峰×ヨーグルトのむらさきシェイク</p></div>
+      </div>
+      <div class="meta"><span id="cardKcal">320 kcal</span><span id="cardMl">250 ml</span></div>
+      <a class="cta" href="#" data-demo="ごめんなさい、カートはありません。ポートフォリオ用につくった架空のブランドです。">Add to Cart</a>
+    </div>
+
+    <div class="badge">
+      <svg viewBox="0 0 100 100">
+        <defs><path id="circ" d="M50,50 m-38,0 a38,38 0 1,1 76,0 a38,38 0 1,1 -76,0"/></defs>
+        <text font-size="9.5" letter-spacing="2.5" fill="currentColor" font-family="Outfit">
+          <textPath href="#circ">REAL FRUIT · 100% · REAL FRUIT · 100% ·</textPath>
+        </text>
+      </svg>
+      <div class="pct">100%</div>
+    </div>
+
+    <div class="dots">
+      <button class="dot on" data-i="0" aria-label="Grape"></button>
+      <button class="dot" data-i="1" aria-label="Orange"></button>
+      <button class="dot" data-i="2" aria-label="Apple"></button>
+    </div>
+
+    <div class="arrows">
+      <button class="arrow" id="prev" aria-label="前へ">←</button>
+      <button class="arrow" id="next" aria-label="次へ">→</button>
+    </div>
+
+    <div class="hint">SCROLL</div>
+  </div>
+</div>
+
+<main class="content">
+
+  <!-- ============ 02 COUNT ／ 証明 ============ -->
+  <section class="sec clip s-count" id="count">
+    <div class="drops" id="drops"></div>
+    <div class="wrap">
+      <p class="eyebrow" data-rise>02 — The Count</p>
+      <h2 class="lead" data-rise>1杯に、これだけの果物。</h2>
+      <div class="counts" data-rise-group>
+        <div class="count-item" data-to="12" data-dec="0">
+          <img src="assets/fresh_grape.webp" alt="巨峰" loading="lazy">
+          <p class="num"><span class="n">0</span><em>粒</em></p>
+          <p class="cl">巨峰 — Grape Velvet</p>
+        </div>
+        <div class="count-item" data-to="1.5" data-dec="1">
+          <img src="assets/fresh_orange.webp" alt="完熟オレンジ" loading="lazy">
+          <p class="num"><span class="n">0</span><em>個分</em></p>
+          <p class="cl">完熟オレンジ — Orange Glow</p>
+        </div>
+        <div class="count-item" data-to="1" data-dec="0">
+          <img src="assets/fresh_apple.webp" alt="紅玉りんご" loading="lazy">
+          <p class="num"><span class="n">0</span><em>個分</em></p>
+          <p class="cl">紅玉りんご — Apple Blush</p>
+        </div>
+      </div>
+      <p class="count-note" data-rise>香料も着色料も保存料も、入れてません。<br>
+        果物と、氷と、自家製ヨーグルト。原材料は、それだけです。</p>
+    </div>
+  </section>
+
+  <!-- ============ 03 OUR SHAKES ／ 品書き ============ -->
+  <section class="sec s-shakes" id="shakes">
+    <div class="wrap">
+      <p class="eyebrow" data-rise>03 — Our Shakes</p>
+      <h2 class="lead" data-rise>おいしいところだけ、ぎゅっと。</h2>
+      <p class="sub" data-rise>季節にあわせてレシピが変わります。そのとき熟れているものを選んでいます。</p>
+
+      <div class="shelf" data-rise-group>
+        <article class="shake" style="--c:#C89BE0">
+          <div class="shake-vis">
+            <img class="sp" src="assets/fresh_grape.webp" alt="" loading="lazy">
+            <img class="sg" src="assets/glass_grape.webp" alt="Grape Velvet" loading="lazy">
+          </div>
+          <div class="shake-body">
+            <h3>Grape Velvet</h3>
+            <p class="jpname">グレープ ベルベット</p>
+            <p class="desc">皮ごと潰してます。渋みがちょっと残るくらいが好きなので。</p>
+            <dl class="spec">
+              <div><dt>果実</dt><dd>巨峰 12粒</dd></div>
+              <div><dt>ベース</dt><dd>自家製ヨーグルト</dd></div>
+              <div><dt>容量</dt><dd>250 ml ／ 320 kcal</dd></div>
+            </dl>
+            <p class="price">¥780</p>
+          </div>
+        </article>
+
+        <article class="shake" style="--c:#F5C06A">
+          <div class="shake-vis">
+            <img class="sp" src="assets/fresh_orange.webp" alt="" loading="lazy">
+            <img class="sg" src="assets/glass_orange.webp" alt="Orange Glow" loading="lazy">
+          </div>
+          <div class="shake-body">
+            <h3>Orange Glow</h3>
+            <p class="jpname">オレンジ グロウ</p>
+            <p class="desc">薄皮ごと入れます。酸っぱさは削らずに、そのまま。</p>
+            <dl class="spec">
+              <div><dt>果実</dt><dd>完熟オレンジ 1.5個分</dd></div>
+              <div><dt>ベース</dt><dd>牛乳＋しぼりたて果汁</dd></div>
+              <div><dt>容量</dt><dd>250 ml ／ 340 kcal</dd></div>
+            </dl>
+            <p class="price">¥740</p>
+          </div>
+        </article>
+
+        <article class="shake" style="--c:#F2A08F">
+          <div class="shake-vis">
+            <img class="sp" src="assets/fresh_apple.webp" alt="" loading="lazy">
+            <img class="sg" src="assets/glass_apple.webp" alt="Apple Blush" loading="lazy">
+          </div>
+          <div class="shake-body">
+            <h3>Apple Blush</h3>
+            <p class="jpname">アップル ブラッシュ</p>
+            <p class="desc">紅玉は生のまま。火を通すと香りが飛んじゃうので。</p>
+            <dl class="spec">
+              <div><dt>果実</dt><dd>紅玉りんご 1個分</dd></div>
+              <div><dt>ベース</dt><dd>牛乳</dd></div>
+              <div><dt>容量</dt><dd>250 ml ／ 330 kcal</dd></div>
+            </dl>
+            <p class="price">¥760</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 04 LAYERS ／ つくり ============ -->
+  <section class="sec s-layers" id="layers">
+    <div class="wrap">
+      <p class="eyebrow" data-rise>04 — Layers</p>
+      <h2 class="lead" data-rise>飲むたびに、味が変わる。</h2>
+      <p class="sub" data-rise>混ぜずに、上から重ねていくだけ。だから飲むほど濃くなります。</p>
+
+      <div class="diagram">
+        <div class="dia-glass"><img src="assets/shake_grape.webp" alt="" loading="lazy"></div>
+        <div class="dia-body">
+        <span class="dia-rail"><i></i></span>
+        <ol class="dia-list">
+          <li>
+            <span class="no">01</span>
+            <h3>生果肉</h3>
+            <p>その場で潰します。粒が残ってるのは、わざとです。</p>
+          </li>
+          <li>
+            <span class="no">02</span>
+            <h3>自家製ヨーグルト</h3>
+            <p>24時間発酵、砂糖なし。果物の甘さを受け止める係です。</p>
+          </li>
+          <li>
+            <span class="no">03</span>
+            <h3>クラッシュアイス</h3>
+            <p>粗めに砕いた氷。溶けにくいので、最後まで薄まりません。</p>
+          </li>
+          <li>
+            <span class="no">04</span>
+            <h3>果汁</h3>
+            <p>いちばん底に沈めます。だから最後のひと口がいちばん濃いです。</p>
+          </li>
+        </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 05 PROMISE ／ 約束（色が戻る） ============ -->
+  <section class="s-promise" id="promise">
+    <div class="wrap pro-intro">
+      <p class="eyebrow" data-rise>05 — Promise</p>
+      <h2 class="lead" data-rise>果物に、まかせてます。</h2>
+    </div>
+
+    <div class="pro-tri">
+      <article class="pro-panel">
+        <img src="assets/sky_grape.webp" alt="" loading="lazy">
+        <img class="pro-obj" src="assets/promise_grape.webp" alt="" loading="lazy">
+        <div class="pro-in">
+          <span class="pno">01</span>
+          <h3>完熟だけ、使います。</h3>
+          <p class="pro-fact">契約農家 12軒</p>
+          <p class="pdesc">その週に穫れたぶんで作ります。届かない日は、その味はお休みです。</p>
+        </div>
+      </article>
+      <article class="pro-panel">
+        <img src="assets/sky_orange.webp" alt="" loading="lazy">
+        <img class="pro-obj" src="assets/promise_orange.webp" alt="" loading="lazy">
+        <div class="pro-in">
+          <span class="pno">02</span>
+          <h3>砂糖は入れません。</h3>
+          <p class="pro-fact">砂糖 0g</p>
+          <p class="pdesc">甘さは果物の熟れ具合しだいです。だから先週と今週で味が違います。</p>
+        </div>
+      </article>
+      <article class="pro-panel">
+        <img src="assets/sky_apple.webp" alt="" loading="lazy">
+        <img class="pro-obj" src="assets/promise_apple.webp" alt="" loading="lazy">
+        <div class="pro-in">
+          <span class="pno">03</span>
+          <h3>その場で砕きます。</h3>
+          <p class="pro-fact">提供まで 30秒</p>
+          <p class="pdesc">作り置きはしません。注文をもらってから、だいたい30秒お待たせします。</p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ 06 STORES ／ 店（締め・明るく開く） ============ -->
+  <section class="sec clip s-stores" id="stores">
+    <div class="wrap">
+      <p class="eyebrow" data-rise>06 — Stores</p>
+      <h2 class="lead" data-rise>近くに来たら、寄ってください。</h2>
+      <p class="sub" data-rise>どの店でも、同じつくり方です。<br>
+        その日に届いた果物だけなので、売り切れたらおしまい。</p>
+
+      <ul class="stores" data-rise-group>
+        <li>
+          <span class="st-no">01</span>
+          <h3>中目黒</h3>
+          <p class="addr">東京都目黒区青葉台 1-14-3<br>東急東横線 中目黒駅から徒歩6分</p>
+          <p class="hrs">11:00 – 20:00 ／ 不定休<br>テイクアウト専門・6坪</p>
+        </li>
+        <li>
+          <span class="st-no">02</span>
+          <h3>中崎町</h3>
+          <p class="addr">大阪府大阪市北区中崎西 2-4-12<br>大阪メトロ 中崎町駅から徒歩3分</p>
+          <p class="hrs">11:00 – 19:00 ／ 火曜定休<br>イートイン8席・8坪</p>
+        </li>
+        <li>
+          <span class="st-no">03</span>
+          <h3>薬院</h3>
+          <p class="addr">福岡県福岡市中央区薬院 3-7-8<br>西鉄天神大牟田線 薬院駅から徒歩5分</p>
+          <p class="hrs">11:00 – 19:00 ／ 水曜定休<br>イートイン4席・6坪</p>
+        </li>
+        <li class="soon">
+          <span class="st-no">04</span>
+          <h3>京都・河原町</h3>
+          <p class="addr">京都府京都市中京区 ／ 準備中</p>
+          <p class="soon-tag">2026年 秋オープン予定</p>
+        </li>
+      </ul>
+
+      <div class="store-cta" data-rise>
+        <a class="btn btn-p" href="#" data-demo="ごめんなさい、注文はできません。ポートフォリオ用につくった架空のブランドです。">オンラインで注文する</a>
+        <a class="btn btn-s" href="#" data-demo="住所も架空なので、地図にはつながりません。">地図で見る</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ フッター ============ -->
+  <footer class="s-foot">
+    <div class="wrap">
+      <p class="foot-mark">FURUTTO</p>
+      <div class="foot-rows">
+        <nav>
+          <a href="#shakes">Our Shakes</a>
+          <a href="#layers">Layers</a>
+          <a href="#promise">Promise</a>
+          <a href="#stores">Stores</a>
+        </nav>
+        <p class="foot-meta">
+          〒153-0042 東京都目黒区青葉台 1-14-3<br>
+          hello@furutto.example ／ 03-0000-0000
+        </p>
+      </div>
+      <p class="fiction">© 2026 FURUTTO<br>
+        架空のブランドです。ポートフォリオ用に制作しました。<br>
+        A fictional brand, created for portfolio purposes.</p>
+    </div>
+  </footer>
+
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- ライブラリは自前で持つ。CDNは落ちても404でも気づけない
+     （実際 Lenis の cdnjs パスは存在せず、慣性スクロールが無効のまま公開されていた） -->
+<script src="assets/js/gsap.min.js"></script>
+<script src="assets/js/ScrollTrigger.min.js"></script>
+<script src="assets/js/lenis.min.js"></script>
+<script>
+gsap.registerPlugin(ScrollTrigger);
+const PLACE = {"grape":{"glass":{"l":42.818,"t":7.194,"w":14.218},"fruits":[{"i":0,"l":74.6,"t":0.0,"w":8.564,"size":166441},{"i":1,"l":0.0,"t":25.879,"w":6.855,"size":152868},{"i":2,"l":93.418,"t":31.999,"w":6.582,"size":116609},{"i":3,"l":16.891,"t":0.0,"w":7.745,"size":105657},{"i":4,"l":69.218,"t":23.665,"w":5.564,"size":77496},{"i":5,"l":31.0,"t":20.964,"w":5.091,"size":70009},{"i":6,"l":16.455,"t":44.401,"w":5.164,"size":56361},{"i":7,"l":64.455,"t":37.63,"w":4.109,"size":43286}]},"orange":{"glass":{"l":42.836,"t":7.292,"w":14.345},"fruits":[{"i":0,"l":74.364,"t":25.684,"w":16.873,"size":639319},{"i":1,"l":15.018,"t":0.0,"w":13.109,"size":297543},{"i":2,"l":73.545,"t":0.0,"w":11.109,"size":247296},{"i":3,"l":0.0,"t":26.53,"w":7.255,"size":161715},{"i":4,"l":68.2,"t":23.112,"w":7.545,"size":122238},{"i":5,"l":94.4,"t":32.389,"w":5.6,"size":97866},{"i":6,"l":30.8,"t":22.461,"w":5.509,"size":69240},{"i":7,"l":16.255,"t":43.848,"w":5.436,"size":65215},{"i":8,"l":64.255,"t":37.76,"w":4.473,"size":46786}]},"apple":{"glass":{"l":42.764,"t":7.161,"w":14.418},"fruits":[{"i":0,"l":74.564,"t":25.977,"w":16.818,"size":600138},{"i":1,"l":15.109,"t":0.0,"w":12.909,"size":295752},{"i":2,"l":73.618,"t":0.0,"w":11.055,"size":246006},{"i":3,"l":0.0,"t":26.53,"w":7.418,"size":161894},{"i":4,"l":68.345,"t":23.991,"w":7.436,"size":113422},{"i":5,"l":94.109,"t":31.966,"w":5.891,"size":103519},{"i":6,"l":30.873,"t":22.233,"w":5.455,"size":71730},{"i":7,"l":16.4,"t":43.783,"w":5.382,"size":67409},{"i":8,"l":64.327,"t":37.663,"w":4.4,"size":46420}]}};
+const LIQUID_TOP = 56.315;
+
+/* 「動きを減らす」設定。ヒーローより前で判定しないと Lenis に間に合わない */
+const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* 慣性スクロール自体が動きなので、REDUCE では素のスクロールに戻す */
+let lenis = null;
+if (window.Lenis && !REDUCE) {
+  lenis = new Lenis({ lerp: 0.12 });
+  lenis.on('scroll', ScrollTrigger.update);
+  gsap.ticker.add(t => lenis.raf(t * 1000));
+  gsap.ticker.lagSmoothing(0);
+}
+
+const KEYS = ['grape','orange','apple'];
+const FLAVORS = [
+  { word:'Grapetastic',   name:'Grape Velvet', desc:'巨峰×ヨーグルトのむらさきシェイク',   kcal:'320 kcal', ml:'250 ml' },
+  { word:'Orangelicious', name:'Orange Glow',  desc:'完熟オレンジのサンシャインシェイク',   kcal:'340 kcal', ml:'250 ml' },
+  { word:'Appleful',      name:'Apple Blush',  desc:'紅玉りんご×ミルクのクリームシェイク', kcal:'330 kcal', ml:'250 ml' },
+];
+const THEMES = [
+  { '--tone':'#C89BE0','--dark':'#4B2258' },
+  { '--tone':'#F5C06A','--dark':'#7A4508' },
+  { '--tone':'#F2A08F','--dark':'#7A2415' },
+];
+/* 手前に出す果物の数（サイズ上位N個は文字の手前=l-front に置く） */
+const FRONT_COUNT = 2;
+
+const stage = document.getElementById('stage');
+const wordEl = document.getElementById('word');
+const layers = {
+  sky:    document.getElementById('skyLayer'),
+  glass:  document.getElementById('glassLayer'),
+  back:   document.getElementById('backLayer'),
+  liquid: document.getElementById('liquidLayer'),
+  front:  document.getElementById('frontLayer'),
+};
+const nodes = [];  // フレーバーごとのDOM参照
+
+/* ---- レイヤーDOMを構築 ---- */
+KEYS.forEach((key, fi) => {
+  const p = PLACE[key];
+  const on = fi === 0 ? ' on' : '';
+
+  const sky = document.createElement('img');
+  sky.className = 'sky' + on; sky.src = `assets/sky_${key}.webp`; sky.alt = '';
+  layers.sky.appendChild(sky);
+
+  const glass = document.createElement('img');
+  glass.className = 'glass' + on; glass.src = `assets/glass_${key}.webp`; glass.alt = '';
+  layers.glass.appendChild(glass);
+
+  const liquid = document.createElement('img');
+  liquid.className = 'liquid' + on; liquid.src = `assets/liquid_${key}.webp`; liquid.alt = '';
+  layers.liquid.appendChild(liquid);
+
+  const fruits = p.fruits.map((f, idx) => {
+    const el = document.createElement('img');
+    el.className = 'fruit' + on;
+    el.src = `assets/fruit_${key}_${f.i}.webp`; el.alt = '';
+    // 大きい粒(=手前)は文字の上、それ以外は文字の下（グラス層）
+    (idx < FRONT_COUNT ? layers.front : layers.back).appendChild(el);
+    return el;
+  });
+
+  nodes.push({ sky, glass, liquid, fruits });
+});
+
+/* ============================================================
+   縦画面用の配置
+   素材は 5500x3072（1.79:1）の横長構図。スマホ縦は 0.46:1 なので、
+   高さを埋めると中央26%しか映らず果物が1粒も入らない。
+   トリミングでは解決しないため、縦専用の構図を別に持つ。
+
+   l/w は画面幅に対する%、t は画面高さに対する%。
+
+   グラスと液体はここでは触らない。あの2つは元写真の中で
+   「グラスの足元に波紋がくぼんでいる」という関係を持っていて、
+   別々に動かすと液面がただの直線としてグラスを横切る。CSS側でまとめて縮める。
+
+   果物の素材は、元写真の画面端で見切れていたものをそのまま切り抜いてある。
+   PCは「切れている辺＝画面端」に置いてあるので切れ口が見えない
+   （_1は左79%切断でl=0、_2は右89%切断でl=93、_3は上89%切断でt=0）。
+   縦画面でも同じ原則を守る：
+
+     ・左が切れている粒 → 左端からはみ出させる
+     ・右が切れている粒 → 右端からはみ出させる
+     ・上が切れている粒 → ナビと重なるので、縦では使わない
+     ・切れていない粒   → 画面内に自由配置
+
+   結果、縦では味ごとに4粒だけ使う。i は素材の番号（配列の順番ではない）。 */
+const PLACE_SM = {
+  //        素材      左右位置  上下  幅        切れ方
+  grape:  [ {i:1, l:-7, t:27, w:22},   // 左79%切断 → 左へ逃がす
+            {i:2, l:83, t:19, w:20},   // 右89%切断 → 右へ逃がす
+            {i:4, l: 6, t: 9, w:18},   // きれい
+            {i:5, l:74, t:38, w:14} ], // きれい
+  orange: [ {i:3, l:-7, t:27, w:23},   // 左90%切断
+            {i:5, l:86, t:19, w:17},   // 右92%切断
+            {i:0, l: 4, t: 8, w:26},   // きれい（大きい半割り）
+            {i:4, l:74, t:38, w:16} ], // きれい
+  apple:  [ {i:3, l:-7, t:27, w:23},   // 左86%切断
+            {i:5, l:86, t:19, w:17},   // 右89%切断
+            {i:0, l: 4, t: 8, w:26},   // きれい（大きい半割り）
+            {i:4, l:74, t:38, w:16} ], // きれい
+};
+const mqSm = window.matchMedia('(max-width: 760px)');
+
+function applyPlace() {
+  const sm = mqSm.matches;
+  KEYS.forEach((key, fi) => {
+    const p = PLACE[key], n = nodes[fi];
+    /* グラスは常に元画像の座標系のまま。縦画面では親のキャンバスごと縮む */
+    Object.assign(n.glass.style, { left: p.glass.l+'%', top: p.glass.t+'%',
+      width: p.glass.w+'%' });
+    /* 縦では素材番号で引く（配列の順番＝大きさ順とは別） */
+    const bySrc = sm ? new Map(PLACE_SM[key].map(s => [s.i, s])) : null;
+    n.fruits.forEach((el, k) => {
+      const s = sm ? bySrc.get(p.fruits[k].i) : p.fruits[k];
+      if (!s) { el.style.display = 'none'; return; }   // 縦で使わない粒は消す
+      Object.assign(el.style, { display:'', left: s.l+'%', top: s.t+'%', width: s.w+'%' });
+    });
+  });
+}
+applyPlace();
+/* matchMedia の change は環境によって取りこぼすので、resize でも見張る。
+   ブレークポイントをまたいだときだけ組み直す（スクロールでURLバーが動くたびに走らせない） */
+let smState = mqSm.matches;
+function syncPlace() {
+  if (mqSm.matches === smState) return;
+  smState = mqSm.matches;
+  applyPlace();
+  ScrollTrigger.refresh();
+}
+mqSm.addEventListener('change', syncPlace);
+window.addEventListener('resize', syncPlace);
+window.addEventListener('orientationchange', syncPlace);
+/* イベントに頼らない保険。ステージの箱が変わったら必ず走る */
+if (window.ResizeObserver) new ResizeObserver(syncPlace).observe(stage);
+
+let current = 0;
+
+/* ---- UI色：スクロールで連続補間 ---- */
+const colorTl = gsap.timeline({
+  scrollTrigger: {
+    trigger: '#track', start: 'top top', end: 'bottom bottom', scrub: 0.6,
+    /* スナップは指を離したあとに画面が勝手に動くので、REDUCE では外す */
+    ...(REDUCE ? {} : {
+      snap: { snapTo: [0, 0.5, 1], duration: { min: 0.3, max: 0.9 }, ease: 'power2.inOut', delay: 0.1 }
+    }),
+    onUpdate: self => {
+      const p = self.progress;
+      /* 不感帯：いま居る味から離れるときだけ少し余分に進む必要がある。
+         境界でスクロールが揺れても切替が往復しない */
+      const t1 = current === 0 ? 0.30 : 0.20;   // 葡萄 ↔ オレンジ の境目
+      const t2 = current === 2 ? 0.70 : 0.80;   // オレンジ ↔ りんご の境目
+      const idx = p < t1 ? 0 : p < t2 ? 1 : 2;
+      if (idx !== current) setFlavor(idx);
+    }
+  }
+});
+colorTl.to(stage, { ...THEMES[1], ease:'none', duration:1 })
+       .to(stage, { ...THEMES[2], ease:'none', duration:1 });
+
+/* 切替に関わらないフレーバーを初期状態に戻す。
+   切替が途中で中断されても、前の味が画面に取り残されないようにするため */
+function resetNode(n) {
+  const all = [n.sky, n.glass, n.liquid, ...n.fruits];
+  gsap.killTweensOf(all);
+  gsap.set(all, { autoAlpha:0, yPercent:0, xPercent:0, rotation:0,
+                  scaleY:1, filter:'blur(0px)' });
+}
+let flavorTl = null;   /* 切替アニメ本体。次の切替でまるごと kill する */
+
+/* 文言まわり。通常版はタイムラインの中央から、REDUCE版は即座に呼ぶ */
+function setText(i) {
+  const f = FLAVORS[i];
+  wordEl.textContent = f.word;
+  document.getElementById('cardName').textContent = f.name;
+  document.getElementById('cardDesc').textContent = f.desc;
+  document.getElementById('cardKcal').textContent = f.kcal;
+  document.getElementById('cardMl').textContent = f.ml;
+  document.getElementById('cardThumb').src = `assets/thumb_${KEYS[i]}.webp`;
+}
+
+/* ---- 切替：液体は下へ抜け、果物は上から降る、文字は横 ----
+   重力は常に下向き。スクロールの向きで変えるのは文字の横移動と色だけ。
+   （逆スクロールで液体を上に抜くと、画面全体をなめて残像に見える） */
+function setFlavor(i) {
+  if (i === current) return;
+  const prev = current, dir = i > prev ? 1 : -1;
+  current = i;
+  const f = FLAVORS[i];
+  const O = nodes[prev], N = nodes[i];
+  document.querySelectorAll('.dot').forEach((d, di) => d.classList.toggle('on', di === i));
+
+  /* 動きを減らす設定：落下も横スライドもブラーもやめて、その場で静かに入れ替える。
+     味が切り替わること自体はこのページの中身なので残す */
+  if (REDUCE) {
+    setText(i);
+    gsap.set(wordEl, { xPercent:0, autoAlpha:1 });
+    nodes.forEach((n, ni) => {
+      const all = [n.sky, n.glass, n.liquid, ...n.fruits];
+      gsap.killTweensOf(all);
+      /* トゥイーンを使わず gsap.set で即座に入れ替える。
+         CSSの遷移も上の @media で止めてあるので、ここは1フレームで切り替わる */
+      gsap.set(all, { autoAlpha: ni === i ? 1 : 0,
+                      yPercent:0, xPercent:0, rotation:0, scaleY:1, filter:'none' });
+    });
+    return;
+  }
+
+  /* 切替はすべて1本のタイムラインに入れる。
+     以前は delay 付きの tween をバラで撒いていたが、GSAP の killTweensOf は
+     「delay 待ちで、まだ動き出していない tween」を取りこぼすことがある。
+     取りこぼした1本が後から発火すると、前の味の液体が画面に戻ってくる
+     （2→0→1 と素早く切り替えたとき、りんごの液体が残る現象がこれだった）。
+     タイムラインごと kill すれば、中の予約も一緒に消える。 */
+  if (flavorTl) flavorTl.kill();
+  flavorTl = gsap.timeline();
+  /* 味を飛ばしてスクロールしたとき、間の味が残らないように片付ける */
+  nodes.forEach((n, ni) => { if (ni !== i && ni !== prev) resetNode(n); });
+  /* 下から満ちてくる液体が、抜けていく古い液体の裏に隠れないようにする */
+  gsap.set(O.liquid, { zIndex:1 });
+  gsap.set(N.liquid, { zIndex:2 });
+
+  const D = 1.25;   // 全体の尺
+  const T = flavorTl;   // 以下、第3引数は「タイムライン上の開始位置」（旧 delay）
+
+  /* 背景（空）：静かにクロスフェード */
+  T.to(N.sky, { autoAlpha:1, duration:.8, ease:'power2.inOut' }, 0)
+   .to(O.sky, { autoAlpha:0, duration:.8, ease:'power2.inOut' }, 0);
+
+  /* 液体の海：下へ抜け、新しい海が下から満ちる（手前なので最も大きく動く） */
+  T.to(O.liquid, { yPercent: 120, autoAlpha: 0, duration: .85, ease:'power2.in',
+      onComplete: () => gsap.set(O.liquid, { yPercent: 0 }) }, 0)
+   .fromTo(N.liquid, { yPercent: 120, autoAlpha: 1 },
+      { yPercent: 0, duration: 1.25, ease:'expo.out' }, .22)
+   /* 液体だけ横にもわずかに流れる（単調さを消す） */
+   .fromTo(N.liquid, { xPercent: 2.2 * dir },
+      { xPercent: 0, duration: D * 1.2, ease:'expo.out' }, 0);
+
+  /* グラス：液体と一緒に沈み、新しいグラスが下から現れる */
+  T.to(O.glass, { yPercent: 60, autoAlpha: 0, duration: .6, ease:'power2.in',
+      onComplete: () => gsap.set(O.glass, { yPercent: 0 }) }, 0)
+   .fromTo(N.glass, { yPercent: 55, autoAlpha: 0 },
+      { yPercent: 0, autoAlpha: 1, duration: 1.15, ease:'expo.out' }, .3)
+   /* グラスの着地にわずかな沈み込み（「とん」と落ちた感じ） */
+   .fromTo(N.glass, { scaleY: 1 },
+      { keyframes: [
+          { scaleY: 1.014, duration: 0.10 },
+          { scaleY: 0.993, duration: 0.15 },
+          { scaleY: 1,     duration: 0.34, ease:'power2.out' },
+        ], transformOrigin: '50% 100%' }, D * 0.62);
+
+  /* 果物：旧は落ちて抜け、新は上から時間差で降ってくる（手前ほど遅く・大きく動く） */
+  O.fruits.forEach((el, k) => {
+    T.to(el, { yPercent: 260, autoAlpha: 0, rotation: (k%2?1:-1)*14,
+      duration: .55 + k*0.03, ease:'power2.in',
+      onComplete: () => gsap.set(el, { yPercent:0, rotation:0 }) }, 0);
+  });
+  N.fruits.forEach((el, k) => {
+    T.fromTo(el,
+      { yPercent: -320 - k*40, autoAlpha: 0, rotation: (k%2?-1:1)*16 },
+      { yPercent: 0, autoAlpha: 1, rotation: 0, duration: 1.4, ease:'expo.out' },
+      .28 + k*0.07);
+  });
+
+  /* 切替の瞬間だけ軽いブラー。「スライド」ではなく「変化」に見せる */
+  const blurTargets = [O.sky, N.sky, O.glass, N.glass, O.liquid, N.liquid];
+  T.to(blurTargets, { filter:'blur(6px)', duration: D*0.28, ease:'power2.out' }, 0)
+   .to(blurTargets, { filter:'blur(0px)', duration: D*0.55, ease:'power2.inOut' }, D*0.28);
+
+  /* 文字：横軸。差し替えは中央のコールバックで行うので、
+     前の切替が生きていると古い味の文言が後から入ってしまう */
+  T.to(wordEl, { xPercent: -130*dir, autoAlpha:0, duration:.45, ease:'power2.in' }, 0)
+   .add(() => setText(i), .45)
+   .fromTo(wordEl, { xPercent: 130*dir, autoAlpha:0 },
+      { xPercent:0, autoAlpha:1, duration:.85, ease:'expo.out' }, .45);
+}
+
+function goTo(i) {
+  i = Math.max(0, Math.min(2, i));
+  const st = colorTl.scrollTrigger;
+  const y = st.start + [0,.5,1][i] * (st.end - st.start);
+  if (lenis) lenis.scrollTo(y, { duration: 1.1 });
+  else window.scrollTo({ top: y, behavior: REDUCE ? 'auto' : 'smooth' });
+}
+document.getElementById('prev').addEventListener('click', () => goTo(current-1));
+document.getElementById('next').addEventListener('click', () => goTo(current+1));
+document.querySelectorAll('.dot').forEach(d => d.addEventListener('click', () => goTo(+d.dataset.i)));
+
+/* ==========================================================
+   後続セクション（02〜07）
+   CSSの初期値＝最終形。動きはすべて gsap.from() で足しているので、
+   reduce 指定の環境では下の分岐ごと止めれば中身はそのまま出る。
+   ========================================================== */
+
+/* ---- 02：ヒーローから降ってきた粒。スクロールで視差をつける ---- */
+const DROP_SPEC = [
+  { f:'grape_3',  l:  2, t: 3, w:5.6, sp:-90  },
+  { f:'grape_6',  l: 91, t:11, w:4.2, sp:-150 },
+  { f:'orange_6', l:  1, t:71, w:5.0, sp:-70  },
+  { f:'apple_5',  l: 82, t:38, w:4.6, sp:-120 },
+  { f:'grape_1',  l: 55, t:90, w:3.6, sp:-55  },
+  { f:'orange_8', l: 72, t: 3, w:3.4, sp:-170 },
+  { f:'apple_8',  l: 89, t:78, w:3.0, sp:-105 },
+  { f:'grape_7',  l: 31, t:93, w:3.2, sp:-80  },
+];
+const dropsEl = document.getElementById('drops');
+DROP_SPEC.forEach(d => {
+  const im = document.createElement('img');
+  im.src = `assets/fruit_${d.f}.webp`; im.alt = ''; im.loading = 'lazy';
+  im.style.left = d.l + '%'; im.style.top = d.t + '%'; im.style.width = d.w + '%';
+  dropsEl.appendChild(im);
+  if (!REDUCE) gsap.to(im, { yPercent: d.sp, ease:'none',
+    scrollTrigger:{ trigger:'#count', start:'top bottom', end:'bottom top', scrub:0.8 } });
+});
+
+/* ---- 02：0 から実数までカウントアップ ---- */
+document.querySelectorAll('.count-item').forEach(item => {
+  const to  = parseFloat(item.dataset.to);
+  const dec = +(item.dataset.dec || 0);
+  const n   = item.querySelector('.n');
+  if (REDUCE) { n.textContent = to.toFixed(dec); return; }
+  const o = { v:0 };
+  gsap.to(o, { v:to, duration:1.7, ease:'power2.out',
+    scrollTrigger:{ trigger:item, start:'top 82%' },
+    onUpdate: () => n.textContent = o.v.toFixed(dec) });
+});
+
+if (!REDUCE) {
+  /* ---- 共通：立ち上がり ---- */
+  gsap.utils.toArray('[data-rise]').forEach(el => {
+    gsap.from(el, { y:34, autoAlpha:0, duration:1.1, ease:'expo.out',
+      scrollTrigger:{ trigger:el, start:'top 88%' } });
+  });
+  gsap.utils.toArray('[data-rise-group]').forEach(g => {
+    gsap.from(g.children, { y:46, autoAlpha:0, duration:1.15, ease:'expo.out', stagger:0.11,
+      scrollTrigger:{ trigger:g, start:'top 82%' } });
+  });
+
+  /* ---- 04：レールが上から満ちる（液体演出の転用）＋ 各層が順に立つ ---- */
+  gsap.from('.dia-rail i', { scaleY:0, transformOrigin:'50% 0%', ease:'none',
+    scrollTrigger:{ trigger:'.dia-body', start:'top 72%', end:'bottom 82%', scrub:0.6 } });
+  gsap.from('.dia-list li', { x:24, autoAlpha:0, duration:1, ease:'expo.out', stagger:0.14,
+    scrollTrigger:{ trigger:'.dia-body', start:'top 78%' } });
+  gsap.from('.dia-glass img', { y:60, autoAlpha:0, duration:1.4, ease:'expo.out',
+    scrollTrigger:{ trigger:'.diagram', start:'top 78%' } });
+
+  /* ---- 05：三枚が順に立ち上がる ---- */
+  gsap.from('.pro-panel', { y:64, autoAlpha:0, duration:1.25, ease:'expo.out', stagger:0.12,
+    scrollTrigger:{ trigger:'.pro-tri', start:'top 84%' } });
+  gsap.utils.toArray('.pro-in').forEach(el => {
+    gsap.from(el.children, { y:22, autoAlpha:0, duration:1, ease:'expo.out', stagger:0.07,
+      scrollTrigger:{ trigger:el, start:'top 92%' } });
+  });
+}
+
+
+/* ---- 飛び先の無いCTAを押されたとき ---- */
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('on'), 4000);
+}
+
+/* ---- ページ内リンクは Lenis に渡す ---- */
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const id = a.getAttribute('href');
+    if (id.length < 2) {                                 // href="#" のダミーCTA
+      e.preventDefault();
+      showToast(a.dataset.demo || 'ポートフォリオ用につくった架空のブランドです。');
+      return;
+    }
+    const t = document.getElementById(id.slice(1));
+    if (!t) return;
+    e.preventDefault();
+    if (lenis) lenis.scrollTo(t, { duration:1.2 });
+    else t.scrollIntoView({ behavior: REDUCE ? 'auto' : 'smooth' });
+  });
+});
+
+/* 画像が出そろってから位置を測り直す */
+window.addEventListener('load', () => ScrollTrigger.refresh());
+</script>
+</body>
+</html>
