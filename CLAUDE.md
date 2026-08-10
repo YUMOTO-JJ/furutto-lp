@@ -198,13 +198,38 @@ GSAP の `killTweensOf` は「delay待ちでまだ動き出していない tween
 ## 検証のやり方（ハマりどころ）
 
 **macOSのChromeはウィンドウ幅を500px未満にできない。**
-`--window-size=390,844` を指定しても**500pxでレイアウトして390pxに切り取る**。
-モバイル検証は必ず「iframeを390px幅で作る」ハーネス経由で行うこと。
+`--window-size=390,844` を指定しても**黙って500pxになる**（警告なし）。
+撮れるスクリーンショットも 500×757 で返る。実測値:
+
+| 指定 | innerWidth |
+|---|---|
+| `--window-size=390,844`  | **500** |
+| `--window-size=500,844`  | 500 |
+| `--window-size=1280,800` | 1280 |
+
+**厄介なのは 500px でも `max-width:760px` が発火すること。**
+スマホ用CSSは当たるので「それらしく見える」が、`vw` で決まる値は全部ずれる。
+見出し `clamp(2rem,12vw,4.4rem)` は 500px で 60.0px / 390px で 46.8px（**+28.2%**）。
+
+対処は次のどちらか。
+
+```js
+// ① CDP でビューポートを明示的に上書きする
+await send('Emulation.setDeviceMetricsOverride',
+  { width:390, height:844, deviceScaleFactor:2, mobile:true });
+```
 
 ```html
-<!-- iframe を実寸で作って、その中を測る／撮る -->
+<!-- ② 広いウィンドウの中に iframe を実寸で作り、その中を測る／撮る
+     （中身を測るには同一オリジンに置くこと。本番URLだと手が届かない） -->
 <iframe id="frame" src="/index.html" style="width:390px;height:844px;border:0"></iframe>
 ```
+
+**スクロール連動は `window.scrollTo()` で検証しない。**
+スナップと Lenis が引っ張り合って、progress が 0 か 1 にしか止まらない
+（0.5 を狙って 0.00 や 1.00 になる）。CDP で本物のホイールを送り、
+毎回「いま何味か」を読み返して判断すること。狙った位置で撮ったつもりが
+別の味だった、という事故が実際に起きている。
 
 **ブラウザペインもヘッドレスの仮想時間も rAF が進まない**ので、
 GSAP のアニメーションは実時間では測れない。
