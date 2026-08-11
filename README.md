@@ -32,6 +32,12 @@ python3 -m http.server 8000
 
 → http://localhost:8000
 
+## デプロイ
+
+`main` に push すると Vercel が自動で本番を更新します。
+**手元から `vercel deploy` は実行しないこと** — 経路が2本になると、
+GitHub のコードと本番の中身がずれます。
+
 ---
 
 ## 設計のポイント
